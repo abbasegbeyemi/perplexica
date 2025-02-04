@@ -1,15 +1,25 @@
-FROM node:20.18.0-alpine
+FROM node:22-alpine AS builder
 
-ARG NEXT_PUBLIC_WS_URL=ws://127.0.0.1:3001
-ARG NEXT_PUBLIC_API_URL=http://127.0.0.1:3001/api
-ENV NEXT_PUBLIC_WS_URL=${NEXT_PUBLIC_WS_URL}
-ENV NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}
+WORKDIR /app
 
-WORKDIR /home/perplexica
+# Copy package.json and yarn.lock
+COPY package.json yarn.lock ./
+COPY ui /app
 
-COPY ui /home/perplexica/
+# Install dependencies and build the application
+RUN yarn install --frozen-lockfile && yarn build
 
-RUN yarn install --frozen-lockfile
-RUN yarn build
+FROM node:22-alpine 
+ENV NEXT_PUBLIC_WS_URL=ws://localhost:3001
+ENV NEXT_PUBLIC_API_URL=http://localhost:3001/api
+
+WORKDIR /app
+
+COPY --chown=node:node --from=builder /app/.next ./.next
+COPY --chown=node:node --from=builder /app/node_modules ./node_modules
+COPY --chown=node:node --from=builder /app/package.json ./package.json
+COPY --chown=node:node --from=builder /app/public ./public
+
+USER node
 
 CMD ["yarn", "start"]
